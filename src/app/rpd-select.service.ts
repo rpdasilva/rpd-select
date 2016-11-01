@@ -1,78 +1,105 @@
 import { Injectable, EventEmitter } from '@angular/core';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import {
+  BehaviorSubject,
+  ConnectableObservable,
+  Observable,
+  Subject
+} from 'rxjs';
 
-const PREV = 'prev';
-const NEXT = 'next';
+const PREV = 'PREV';
+const NEXT = 'NEXT';
+const ADD_OPTION = 'ADD_OPTION';
+const REMOVE_OPTION = 'REMOVE_OPTION';
 
 @Injectable()
 export class RpdSelectService {
-  private _isVisible: BehaviorSubject<boolean> = new BehaviorSubject(false);
-  private _isDisabled: BehaviorSubject<boolean> = new BehaviorSubject(false);
-  private _focusedOption: Subject<any> = new Subject();
-  private _options: any[] = [];
-  isVisible: Observable<boolean>;
-  isDisabled: Observable<boolean>;
-  focusedOption: Observable<any>;
-  value: Subject<any> = new Subject();
+  private _isVisible$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  private _isDisabled$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  private _focusedOption$: Subject<any> = new Subject();
+  private _options$: Subject<any> = new Subject();
+  isVisible$: Observable<boolean>;
+  isDisabled$: Observable<boolean>;
+  focusedOption$: Observable<any>;
+  options$: ConnectableObservable<any>;
+  value$: Subject<any> = new Subject();
 
   constructor() {
-    this.isVisible = this._isVisible.scan(this._toggle);
-    this.isDisabled = this._isDisabled.scan(this._toggle);
-    this.focusedOption = this._focusedOption.scan((currentFocused, next) => {
-      return typeof next === 'string' ?
-        this._findNextOption(currentFocused, next) : next;
-    });
+    this.isVisible$ = this._isVisible$.scan(this._toggle);
+    this.isDisabled$ = this._isDisabled$.scan(this._toggle);
+    this.options$ = this._options$
+      .scan(this._optionsReducer, [])
+      .cache(1)
+      .publish();
+    this.options$.connect();
+
+    this.focusedOption$ = this._focusedOption$
+      .withLatestFrom(this.options$)
+      .scan((focused, [next, options]) =>
+        this._getFocusedOption(options, focused, next))
+      .cache(1);
   }
 
-  register(option) {
-    this._options = [...this._options, option];
+  register(option: any) {
+    this._options$.next({ type: ADD_OPTION, payload: option });
   }
 
-  deregister(toRemove: any) {
-    this._options = this._options.filter(option => option !== toRemove);
+  deregister(option: any) {
+    this._options$.next({ type: REMOVE_OPTION, payload: option });
   }
 
   updateValue(value: any) {
     console.log('Updating Value', value);
-    this.value.next(value);
+    this.value$.next(value);
   }
 
   toggleVisibility(isVisible?: boolean) {
-    this._isVisible.next(isVisible);
+    this._isVisible$.next(isVisible);
   }
 
   toggleDisability(isDisabled?: boolean) {
-    this._isDisabled.next(isDisabled);
+    this._isDisabled$.next(isDisabled);
   }
 
-  setFocus(option: any) {
-    this._focusedOption.next(option);
-  }
-
-  focusOption(direction: string) {
-    this._focusedOption.next(direction);
+  setFocus(next: any) {
+    this._focusedOption$.next(next);
   }
 
   focusPrevOption() {
-    this.focusOption(PREV);
+    this.setFocus(PREV);
   }
 
   focusNextOption() {
-    this.focusOption(NEXT);
+    this.setFocus(NEXT);
   }
 
-  private _findNextOption(option: any, direction: string) {
-    const currentIndex = this._options.indexOf(option);
+  private _optionsReducer(options, action) {
+    switch (action.type) {
+    case ADD_OPTION:
+      return [...options, action.payload];
+    case REMOVE_OPTION:
+      return options.filter(option => option !== action.payload);
+    default:
+      return options;
+    }
+  }
+
+  private _getFocusedOption(options, focused, next) {
+    return typeof next === 'string' ?
+      this._findNextOption(options, focused, next) : next;
+  }
+
+  private _findNextOption(options: any[], focused: any, direction: string) {
+    const currentIndex = options.indexOf(focused);
 
     if (currentIndex === -1) {
-      return this._options[0];
+      return options[0];
     } else if (direction === PREV && currentIndex > 0) {
-      return this._options[currentIndex - 1];
-    } else if (direction === NEXT && currentIndex < this._options.length - 1) {
-      return this._options[currentIndex + 1];
+      return options[currentIndex - 1];
+    } else if (direction === NEXT && currentIndex < options.length - 1) {
+      return options[currentIndex + 1];
     }
 
-    return option;
+    return focused;
   }
 
   private _toggle(currentState, toggleOverride) {

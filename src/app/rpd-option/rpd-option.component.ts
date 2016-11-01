@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   ElementRef,
   Input,
@@ -13,27 +14,27 @@ import { RpdSelectService } from '../rpd-select.service';
   selector: 'rpd-option',
   template: `
     <div>
-      <button (click)="updateValue($event, value)" #optionButton>
+      <button (click)="updateValue($event, value)" #optionButton
+        [style.background-color]="(isFocused$ | async) ? '#EEE' : 'initial'">
         <ng-content></ng-content>
 
-        <span *ngIf="isSelected | async">
+        <span *ngIf="isSelected$ | async">
           <svg viewBox="0 0 100 80" style="height: 0.65rem; fill: currentcolor;">
             <polygon points="37.316,80.48 0,43.164 17.798,
               25.366 37.316,44.885 82.202,0 100,17.798 37.316,80.48" />
           </svg>
         </span>
-        <span *ngIf="isFocused | async">Focused</span>
       </button>
-      <span>{{ isFocused | async }}</span>
     </div>
-  `
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RpdOptionComponent implements OnDestroy, OnInit {
   @Input() value: any;
   @ViewChild('optionButton') optionButton: ElementRef;
 
-  private isSelected: Observable<boolean>;
-  private isFocused: Observable<boolean>;
+  private isSelected$: Observable<boolean>;
+  private isFocused$: Observable<boolean>;
 
   constructor(private rpdSelect: RpdSelectService,
     private element: ElementRef) {
@@ -41,10 +42,10 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
   }
 
   ngOnInit() {
-    this.isSelected = this.rpdSelect.value
+    this.isSelected$ = this.rpdSelect.value$
       .map(value => value === this.value);
 
-    this.isFocused = this.rpdSelect.focusedOption
+    this.isFocused$ = this.rpdSelect.focusedOption$
       .map(option => option === this)
       .do(option => option && this.focus());
   }

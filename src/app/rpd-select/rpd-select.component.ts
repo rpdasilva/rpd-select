@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   HostListener,
   Input,
@@ -36,13 +37,13 @@ const KEY_CODES = {
   template: `
     <div>
       <button (click)="toggleVisibility($event)"
-        >{{ (currentLabel | async) || placeholder }}
+        >{{ (currentLabel$ | async) || placeholder }}
         <svg viewBox="0 0 10 10" style="height: 0.5rem; fill: currentcolor;">
           <polygon points="0 0,10 0,5 10" />
         </svg>
       </button>
 
-      <div *ngIf="rpdSelect.isVisible | async">
+      <div *ngIf="rpdSelect.isVisible$ | async">
         <ng-content></ng-content>
       </div>
     </div>
@@ -54,26 +55,27 @@ const KEY_CODES = {
       useExisting: forwardRef(() => RpdSelectComponent),
       multi: true
     }
-  ]
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RpdSelectComponent implements ControlValueAccessor, OnInit {
   @Input() placeholder: string;
 
   private propagateChange = (_: any) => {};
   private propagateTouch = () => {};
-  currentLabel: Observable<any>;
+  currentLabel$: Observable<any>;
 
   constructor(private rpdSelect: RpdSelectService) {
   }
 
   ngOnInit() {
-    this.rpdSelect.value.skip(2)
+    this.rpdSelect.value$.skip(2)
       .do(val => console.log('Value:', val))
       .subscribe(value => this.propagateChange(value));
 
-    this.rpdSelect.isVisible.subscribe(() => this.propagateTouch());
+    this.rpdSelect.isVisible$.subscribe(() => this.propagateTouch());
 
-    this.currentLabel = this.rpdSelect.value
+    this.currentLabel$ = this.rpdSelect.value$
       .map(value => `Current Value: ${value}`);
   }
 
@@ -100,20 +102,18 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
 
   @HostListener('keydown', ['$event'])
   onKeyDown(event: KeyboardEvent) {
-    console.log('keydown', event);
-
     switch(event.keyCode) {
-    case KEY_CODES.ESCAPE:
-      this.rpdSelect.toggleVisibility();
-      break;
+      case KEY_CODES.ESCAPE:
+        this.rpdSelect.toggleVisibility();
+        break;
 
-    case KEY_CODES.UP_ARROW:
-      this.rpdSelect.focusPrevOption();
-      break;
+      case KEY_CODES.UP_ARROW:
+        this.rpdSelect.focusPrevOption();
+        break;
 
-    case KEY_CODES.DOWN_ARROW:
-      this.rpdSelect.focusNextOption();
-      break;
+      case KEY_CODES.DOWN_ARROW:
+        this.rpdSelect.focusNextOption();
+        break;
     }
   }
 }
