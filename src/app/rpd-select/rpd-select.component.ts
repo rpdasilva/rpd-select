@@ -101,5 +101,19 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
   @HostListener('keydown', ['$event'])
   onKeyDown(event: KeyboardEvent) {
     console.log('keydown', event);
+
+    switch(event.keyCode) {
+    case KEY_CODES.ESCAPE:
+      this.rpdSelect.toggleVisibility();
+      break;
+
+    case KEY_CODES.UP_ARROW:
+      this.rpdSelect.focusPrevOption();
+      break;
+
+    case KEY_CODES.DOWN_ARROW:
+      this.rpdSelect.focusNextOption();
+      break;
+    }
   }
 }
