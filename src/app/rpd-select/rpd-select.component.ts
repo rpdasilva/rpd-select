@@ -70,16 +70,17 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
 
   ngOnInit() {
     this.rpdSelect.value$.skip(2)
-      .do(val => console.log('Value:', val))
       .subscribe(value => this.propagateChange(value));
 
     this.rpdSelect.isVisible$.subscribe(() => this.propagateTouch());
 
-    this.currentLabel$ = this.rpdSelect.value$
+    this.currentLabel$ = this.rpdSelect.value$.skip(2)
+      .do(value => console.log('Current label: ' + value))
       .map(value => `Current Value: ${value}`);
   }
 
   writeValue(value: any) {
+    console.log('writeValue called', JSON.stringify({ value }));
     this.rpdSelect.updateValue(value);
   }
 
@@ -112,6 +113,7 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
         break;
 
       case KEY_CODES.DOWN_ARROW:
+        console.log('down');
         this.rpdSelect.focusNextOption();
         break;
     }

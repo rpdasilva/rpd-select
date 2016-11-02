@@ -21,10 +21,6 @@ export class AppComponent {
     }, 1000);
   }
 
-  ngAfterViewInit() {
-    console.log('App form', this.form.controls);
-  }
-
   submit(form) {
     console.log('Form: ', form);
   }

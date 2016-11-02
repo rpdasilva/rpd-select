@@ -1,4 +1,4 @@
-import { Injectable, EventEmitter } from '@angular/core';
+import { Injectable } from '@angular/core';
 import {
   BehaviorSubject,
   ConnectableObservable,
@@ -26,16 +26,13 @@ export class RpdSelectService {
   constructor() {
     this.isVisible$ = this._isVisible$.scan(this._toggle);
     this.isDisabled$ = this._isDisabled$.scan(this._toggle);
-    this.options$ = this._options$
-      .scan(this._optionsReducer, [])
-      .cache(1)
-      .publish();
+    this.options$ = this._options$.scan(this._optionsReducer, []).publish();
     this.options$.connect();
 
     this.focusedOption$ = this._focusedOption$
       .withLatestFrom(this.options$)
       .scan((focused, [next, options]) =>
-        this._getFocusedOption(options, focused, next))
+        this._getFocusedOption(options, focused, next), NEXT)
       .cache(1);
   }
 
@@ -48,7 +45,6 @@ export class RpdSelectService {
   }
 
   updateValue(value: any) {
-    console.log('Updating Value', value);
     this.value$.next(value);
   }
 
@@ -74,12 +70,12 @@ export class RpdSelectService {
 
   private _optionsReducer(options, action) {
     switch (action.type) {
-    case ADD_OPTION:
-      return [...options, action.payload];
-    case REMOVE_OPTION:
-      return options.filter(option => option !== action.payload);
-    default:
-      return options;
+      case ADD_OPTION:
+        return [...options, action.payload];
+      case REMOVE_OPTION:
+        return options.filter(option => option !== action.payload);
+      default:
+        return options;
     }
   }
 

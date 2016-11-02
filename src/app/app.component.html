@@ -1,7 +1,7 @@
 <form #form="ngForm" (ngSubmit)="submit(form)">
   <rpd-select placeholder="Default" ngModel name="rpd-select">
       <rpd-option *ngFor="let item of items"
-          [value]="item.value">{{ item.label }}</rpd-option>
+          [value]="item.value" [selected]="true">{{ item.label }}</rpd-option>
   </rpd-select>
 
   <button type="submit">Submit</button>

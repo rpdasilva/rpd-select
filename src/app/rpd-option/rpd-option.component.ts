@@ -41,6 +41,13 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
     this.rpdSelect.register(this);
   }
 
+  @Input('selected')
+  set selectedAttr(selected) {
+    if (!!selected) {
+      Promise.resolve().then(() => this.rpdSelect.updateValue(this.value));
+    }
+  }
+
   ngOnInit() {
     this.isSelected$ = this.rpdSelect.value$
       .map(value => value === this.value);
