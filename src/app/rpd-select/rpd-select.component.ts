@@ -1,42 +1,24 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   HostListener,
   Input,
   OnInit,
+  ViewChild,
   forwardRef
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { Observable, Subject } from 'rxjs';
-import { RpdSelectService } from '../rpd-select.service';
-
-/**
- * Common Keyboard actions and their associated keycode.
- */
-const KEY_CODES = {
-  COMMA: 188,
-  SEMICOLON : 186,
-  ENTER: 13,
-  ESCAPE: 27,
-  SPACE: 32,
-  PAGE_UP: 33,
-  PAGE_DOWN: 34,
-  END: 35,
-  HOME: 36,
-  LEFT_ARROW : 37,
-  UP_ARROW : 38,
-  RIGHT_ARROW : 39,
-  DOWN_ARROW : 40,
-  TAB : 9,
-  BACKSPACE: 8,
-  DELETE: 46
-};
+import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
 
 @Component({
   selector: 'rpd-select',
   template: `
     <div>
-      <button (click)="toggleVisibility($event)"
+      <button [disabled]="rpdSelect.isDisabled$ | async"
+        (keydown)="selectButtonKeyDown($event)"
+        (click)="toggleVisibility($event)" #selectButton
         >{{ (currentLabel$ | async) || placeholder }}
         <svg viewBox="0 0 10 10" style="height: 0.5rem; fill: currentcolor;">
           <polygon points="0 0,10 0,5 10" />
@@ -46,6 +28,7 @@ const KEY_CODES = {
       <div *ngIf="rpdSelect.isVisible$ | async">
         <ng-content></ng-content>
       </div>
+      {{ rpdSelect.isMultiple$ | async }}
     </div>
   `,
   providers: [
@@ -60,6 +43,7 @@ const KEY_CODES = {
 })
 export class RpdSelectComponent implements ControlValueAccessor, OnInit {
   @Input() placeholder: string;
+  @ViewChild('selectButton') selectButton: ElementRef;
 
   private propagateChange = (_: any) => {};
   private propagateTouch = () => {};
@@ -68,11 +52,26 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
   constructor(private rpdSelect: RpdSelectService) {
   }
 
+  @Input() set disabled(isDisabled: any) {
+    isDisabled || isDisabled === '' ? this.setDisabledState(true) :
+      this.setDisabledState(!!isDisabled);
+  }
+
+  @Input() set multiple(isMultiple: any) {
+    isMultiple || isMultiple === '' ? this.rpdSelect.toggleMultiple(true) :
+      this.rpdSelect.toggleMultiple(!!isMultiple);
+  }
+
   ngOnInit() {
     this.rpdSelect.value$.skip(2)
       .subscribe(value => this.propagateChange(value));
 
-    this.rpdSelect.isVisible$.subscribe(() => this.propagateTouch());
+    this.rpdSelect.isVisible$.skip(1)
+      .do(() => this.propagateTouch())
+      .subscribe(isVisible => {
+        isVisible ? this.rpdSelect.focusMostRecentOption() :
+          this.focus();
+      });
 
     this.currentLabel$ = this.rpdSelect.value$.skip(2)
       .do(value => console.log('Current label: ' + value))
@@ -101,11 +100,26 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
     this.rpdSelect.toggleVisibility();
   }
 
+  focus() {
+    this.selectButton.nativeElement.focus();
+  }
+
+  selectButtonKeyDown(event: KeyboardEvent) {
+    switch(event.keyCode) {
+      case KEY_CODES.ENTER:
+      case KEY_CODES.SPACE:
+        event.preventDefault();
+        this.rpdSelect.toggleVisibility();
+        break;
+    }
+  }
+
   @HostListener('keydown', ['$event'])
   onKeyDown(event: KeyboardEvent) {
     switch(event.keyCode) {
       case KEY_CODES.ESCAPE:
-        this.rpdSelect.toggleVisibility();
+      case KEY_CODES.TAB:
+        this.rpdSelect.toggleVisibility(false);
         break;
 
       case KEY_CODES.UP_ARROW:
@@ -113,7 +127,6 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
         break;
 
       case KEY_CODES.DOWN_ARROW:
-        console.log('down');
         this.rpdSelect.focusNextOption();
         break;
     }

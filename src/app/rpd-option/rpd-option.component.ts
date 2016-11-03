@@ -2,20 +2,22 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  HostListener,
   Input,
   OnDestroy,
   OnInit,
   ViewChild
 } from '@angular/core';
 import { Observable } from 'rxjs';
-import { RpdSelectService } from '../rpd-select.service';
+import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
 
 @Component({
   selector: 'rpd-option',
   template: `
     <div>
       <button (click)="updateValue($event, value)" #optionButton
-        [style.background-color]="(isFocused$ | async) ? '#EEE' : 'initial'">
+        [style.background-color]="(isFocused$ | async) ? '#EEE' : 'initial'"
+        [disabled]="disabled">
         <ng-content></ng-content>
 
         <span *ngIf="isSelected$ | async">
@@ -33,18 +35,29 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
   @Input() value: any;
   @ViewChild('optionButton') optionButton: ElementRef;
 
-  private isSelected$: Observable<boolean>;
   private isFocused$: Observable<boolean>;
+  private isSelected$: Observable<boolean>;
+  // TODO: Add support for isMultiple
+  // TODO: Figure out a clean way of exposing node.textContent for typeahead
+  disabled: boolean = false;
 
   constructor(private rpdSelect: RpdSelectService,
     private element: ElementRef) {
     this.rpdSelect.register(this);
   }
 
+  @Input('disabled')
+  set isDisabled(isDisabled) {
+    this.disabled = isDisabled || isDisabled === '' ? true : false;
+  }
+
   @Input('selected')
-  set selectedAttr(selected) {
-    if (!!selected) {
-      Promise.resolve().then(() => this.rpdSelect.updateValue(this.value));
+  set isSelected(isSelected) {
+    console.log('setting selected', this.value);
+    if (!!isSelected || isSelected === '') {
+      // TODO: Figure out a cleaner way of doing this
+      // this.rpdSelect.updateValue(this.value);
+      setTimeout(() => this.rpdSelect.updateValue(this.value));
     }
   }
 
@@ -54,6 +67,7 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
 
     this.isFocused$ = this.rpdSelect.focusedOption$
       .map(option => option === this)
+      .delay(0) // Wait a tick for the DOM to stabilize
       .do(option => option && this.focus());
   }
 
@@ -70,5 +84,14 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
 
   focus() {
     this.optionButton.nativeElement.focus();
+  }
+
+  @HostListener('keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent) {
+    switch(event.keyCode) {
+      case KEY_CODES.ENTER:
+        this.updateValue(event, this.value);
+        break;
+    }
   }
 }

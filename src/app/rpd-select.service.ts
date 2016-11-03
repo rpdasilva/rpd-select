@@ -6,34 +6,67 @@ import {
   Subject
 } from 'rxjs';
 
+const FIRST = 'FIRST';
+const MOST_RECENT = 'MOST_RECENT';
 const PREV = 'PREV';
 const NEXT = 'NEXT';
 const ADD_OPTION = 'ADD_OPTION';
 const REMOVE_OPTION = 'REMOVE_OPTION';
 
+/**
+ * Common Keyboard actions and their associated keycode.
+ */
+export const KEY_CODES = {
+  COMMA: 188,
+  SEMICOLON : 186,
+  ENTER: 13,
+  ESCAPE: 27,
+  SPACE: 32,
+  PAGE_UP: 33,
+  PAGE_DOWN: 34,
+  END: 35,
+  HOME: 36,
+  LEFT_ARROW : 37,
+  UP_ARROW : 38,
+  RIGHT_ARROW : 39,
+  DOWN_ARROW : 40,
+  TAB : 9,
+  BACKSPACE: 8,
+  DELETE: 46
+};
+
 @Injectable()
 export class RpdSelectService {
-  private _isVisible$: BehaviorSubject<boolean> = new BehaviorSubject(false);
   private _isDisabled$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  private _isMultiple$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  private _isVisible$: BehaviorSubject<boolean> = new BehaviorSubject(false);
   private _focusedOption$: Subject<any> = new Subject();
   private _options$: Subject<any> = new Subject();
-  isVisible$: Observable<boolean>;
   isDisabled$: Observable<boolean>;
+  isMultiple$: Observable<boolean>;
+  isVisible$: Observable<boolean>;
   focusedOption$: Observable<any>;
   options$: ConnectableObservable<any>;
   value$: Subject<any> = new Subject();
 
   constructor() {
-    this.isVisible$ = this._isVisible$.scan(this._toggle);
     this.isDisabled$ = this._isDisabled$.scan(this._toggle);
+    this.isMultiple$ = this._isMultiple$.scan(this._toggle);
+    this.isVisible$ = this._isVisible$.scan(this._toggle);
     this.options$ = this._options$.scan(this._optionsReducer, []).publish();
     this.options$.connect();
 
     this.focusedOption$ = this._focusedOption$
       .withLatestFrom(this.options$)
       .scan((focused, [next, options]) =>
-        this._getFocusedOption(options, focused, next), NEXT)
+        this._getFocusedOption(options, focused, next), FIRST)
       .cache(1);
+
+    this.isMultiple$
+      .withLatestFrom(this.value$)
+      .subscribe(([isMultiple, value]) => {
+        this._changeValueForMultiple(isMultiple, value, this.value$);
+      });
   }
 
   register(option: any) {
@@ -48,16 +81,24 @@ export class RpdSelectService {
     this.value$.next(value);
   }
 
-  toggleVisibility(isVisible?: boolean) {
-    this._isVisible$.next(isVisible);
-  }
-
   toggleDisability(isDisabled?: boolean) {
     this._isDisabled$.next(isDisabled);
   }
 
+  toggleMultiple(isMultiple) {
+    this._isMultiple$.next(isMultiple);
+  }
+
+  toggleVisibility(isVisible?: boolean) {
+    this._isVisible$.next(isVisible);
+  }
+
   setFocus(next: any) {
     this._focusedOption$.next(next);
+  }
+
+  focusMostRecentOption() {
+    this.setFocus(MOST_RECENT);
   }
 
   focusPrevOption() {
@@ -87,18 +128,27 @@ export class RpdSelectService {
   private _findNextOption(options: any[], focused: any, direction: string) {
     const currentIndex = options.indexOf(focused);
 
-    if (currentIndex === -1) {
+    if (direction === FIRST || currentIndex === -1) {
       return options[0];
     } else if (direction === PREV && currentIndex > 0) {
       return options[currentIndex - 1];
     } else if (direction === NEXT && currentIndex < options.length - 1) {
       return options[currentIndex + 1];
+    } else {
+      return focused;
     }
-
-    return focused;
   }
 
   private _toggle(currentState, toggleOverride) {
-    return typeof toggleOverride === 'boolean' ? toggleOverride : !currentState;
+    return typeof toggleOverride === 'boolean' ?
+      toggleOverride : !currentState;
+  }
+
+  private _changeValueForMultiple(isMultiple, value, value$) {
+    if (isMultiple && !Array.isArray(value)) {
+      value$.next([value]);
+    } else if (!isMultiple && Array.isArray(value)) {
+      value$.next(value[0]);
+    }
   }
 }
