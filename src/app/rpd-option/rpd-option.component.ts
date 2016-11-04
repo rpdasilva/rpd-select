@@ -9,7 +9,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { Observable } from 'rxjs';
-import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
+import { RpdSelectService, KEY_CODES } from '../rpd-select.service';
 
 @Component({
   selector: 'rpd-option',
@@ -41,9 +41,7 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
   // TODO: Figure out a clean way of exposing node.textContent for typeahead
   disabled: boolean = false;
 
-  constructor(private rpdSelect: RpdSelectService,
-    private element: ElementRef) {
-    this.rpdSelect.register(this);
+  constructor(private rpdSelect: RpdSelectService) {
   }
 
   @Input('disabled')
@@ -69,6 +67,13 @@ export class RpdOptionComponent implements OnDestroy, OnInit {
       .map(option => option === this)
       .delay(0) // Wait a tick for the DOM to stabilize
       .do(option => option && this.focus());
+  }
+
+  ngAfterViewInit() {
+    this.rpdSelect.register({
+      instance: this,
+      label: this.optionButton.nativeElement.textContent.trim()
+    });
   }
 
   ngOnDestroy() {

@@ -5,6 +5,7 @@ import {
   Observable,
   Subject
 } from 'rxjs';
+import { OrderedMap as Map } from 'immutable';
 
 const FIRST = 'FIRST';
 const MOST_RECENT = 'MOST_RECENT';
@@ -35,6 +36,11 @@ export const KEY_CODES = {
   DELETE: 46
 };
 
+export interface IRpdOption {
+  instance: any;
+  label?: string;
+}
+
 @Injectable()
 export class RpdSelectService {
   private _isDisabled$: BehaviorSubject<boolean> = new BehaviorSubject(false);
@@ -46,14 +52,15 @@ export class RpdSelectService {
   isMultiple$: Observable<boolean>;
   isVisible$: Observable<boolean>;
   focusedOption$: Observable<any>;
-  options$: ConnectableObservable<any>;
+  options$: ConnectableObservable<Map<any, IRpdOption>>;
   value$: Subject<any> = new Subject();
 
   constructor() {
     this.isDisabled$ = this._isDisabled$.scan(this._toggle);
     this.isMultiple$ = this._isMultiple$.scan(this._toggle);
     this.isVisible$ = this._isVisible$.scan(this._toggle);
-    this.options$ = this._options$.scan(this._optionsReducer, []).publish();
+    this.options$ = this._options$.scan(this._optionsReducer, Map())
+      .publish();
     this.options$.connect();
 
     this.focusedOption$ = this._focusedOption$
@@ -69,7 +76,7 @@ export class RpdSelectService {
       });
   }
 
-  register(option: any) {
+  register(option: IRpdOption) {
     this._options$.next({ type: ADD_OPTION, payload: option });
   }
 
@@ -109,31 +116,33 @@ export class RpdSelectService {
     this.setFocus(NEXT);
   }
 
-  private _optionsReducer(options, action) {
+  private _optionsReducer(options: Map<any, IRpdOption>, action) {
     switch (action.type) {
       case ADD_OPTION:
-        return [...options, action.payload];
+        return options.set(action.payload.instance, action.payload);
       case REMOVE_OPTION:
-        return options.filter(option => option !== action.payload);
+        return options.delete(action.payload);
       default:
         return options;
     }
   }
 
-  private _getFocusedOption(options, focused, next) {
+  private _getFocusedOption(options: Map<any, IRpdOption>, focused, next) {
     return typeof next === 'string' ?
       this._findNextOption(options, focused, next) : next;
   }
 
-  private _findNextOption(options: any[], focused: any, direction: string) {
-    const currentIndex = options.indexOf(focused);
+  private _findNextOption(options: Map<any, IRpdOption>, focused: any,
+    direction: string) {
+    const instances = Array.from(options.keys() as any);
+    const currentIndex = instances.indexOf(focused);
 
     if (direction === FIRST || currentIndex === -1) {
-      return options[0];
+      return instances[0];
     } else if (direction === PREV && currentIndex > 0) {
-      return options[currentIndex - 1];
-    } else if (direction === NEXT && currentIndex < options.length - 1) {
-      return options[currentIndex + 1];
+      return instances[currentIndex - 1];
+    } else if (direction === NEXT && currentIndex < instances.length - 1) {
+      return instances[currentIndex + 1];
     } else {
       return focused;
     }
