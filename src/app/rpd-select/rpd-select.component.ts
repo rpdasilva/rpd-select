@@ -14,6 +14,9 @@ import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
 
 @Component({
   selector: 'rpd-select',
+  host: {
+    '(keydown)': 'hostKeyDown$.next($event)'
+  },
   template: `
     <div>
       <button [disabled]="rpdSelect.isDisabled$ | async"
@@ -48,8 +51,11 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
   private propagateChange = (_: any) => {};
   private propagateTouch = () => {};
   currentLabel$: Observable<any>;
+  hostKeyDown$: Subject<KeyboardEvent> = new Subject<KeyboardEvent>();
+  hostKeyDownVisible$: Observable<any>;
 
-  constructor(private rpdSelect: RpdSelectService) {
+  constructor(private rpdSelect: RpdSelectService,
+    private element: ElementRef) {
   }
 
   @Input() set disabled(isDisabled: any) {
@@ -72,6 +78,18 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
         isVisible ? this.rpdSelect.focusMostRecentOption() :
           this.focus();
       });
+
+    this.hostKeyDownVisible$ =  this.hostKeyDown$
+      .withLatestFrom(this.rpdSelect.isVisible$)
+      .filter(([, isVisible]) => isVisible);
+
+    this.hostKeyDownVisible$.subscribe(([event]) => this.onHostKeyDown(event));
+    this.hostKeyDownVisible$
+      .filter(([event]) => {
+        // Filter teh key c0dez here
+        return true;
+      })
+      .subscribe(([event]) => this.onSearch(event));
 
     this.currentLabel$ = this.rpdSelect.value$.skip(2)
       .do(value => console.log('Current label: ' + value))
@@ -114,8 +132,7 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
     }
   }
 
-  @HostListener('keydown', ['$event'])
-  onKeyDown(event: KeyboardEvent) {
+  onHostKeyDown(event: KeyboardEvent) {
     switch(event.keyCode) {
       case KEY_CODES.ESCAPE:
       case KEY_CODES.TAB:
@@ -130,5 +147,9 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
         this.rpdSelect.focusNextOption();
         break;
     }
+  }
+
+  onSearch(...args) {
+    console.log('searching', args);
   }
 }
