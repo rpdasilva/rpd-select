@@ -1,10 +1,35 @@
 <form #form="ngForm" (ngSubmit)="submit(form)">
-  <rpd-select placeholder="Default" ngModel name="rpd-select">
+  <rpd-select placeholder="Default" ngModel name="rpd-select" multiple
+    (change)="onChange('rpd-select', $event)">
       <rpd-option *ngFor="let item of items"
-          [value]="item.value" selected>{{ item.label }}</rpd-option>
+          [value]="item.value">{{ item.label }}</rpd-option>
   </rpd-select>
+  <input type="test" ngModel name="test"
+    (change)="onChange('test', $event)">
+  <input type="checkbox" ngModel name="check"
+    (change)="onChange('check', $event)">
+
+  <br>
 
   <button type="submit">Submit</button>
 </form>
 
 <div>Form Value: {{ formValue(form) }}</div>
+
+<form [formGroup]="form2" (ngSubmit)="submit(form2)">
+  <rpd-select placeholder="Default" formControlName="rpd-select"
+    (change)="onChange('rpd-select', $event)">
+      <rpd-option *ngFor="let item of items"
+          [value]="item.value">{{ item.label }}</rpd-option>
+  </rpd-select>
+  <input type="text" formControlName="test"
+    (change)="onChange('test', $event)">
+  <input type="checkbox" formControlName="check"
+    (change)="onChange('check', $event)">
+
+  <br>
+
+  <button type="submit">Submit</button>
+</form>
+
+<div>Form Value: {{ formValue(form2) }}</div>

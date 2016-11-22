@@ -2,21 +2,27 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  EventEmitter,
   HostListener,
   Input,
   OnInit,
+  Output,
   ViewChild,
   forwardRef
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { Observable, Subject } from 'rxjs';
-import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
+import { RpdSelectService, IRpdOption } from '../rpd-select.service';
+import {
+  KEY_CODES,
+  NUMPAD_LOCATION,
+  NUMPAD_OFFSET
+} from '../rpd-select.constants';
+
+const SEARCH_DEBOUNCE = 300;
 
 @Component({
   selector: 'rpd-select',
-  host: {
-    '(keydown)': 'hostKeyDown$.next($event)'
-  },
   template: `
     <div>
       <button [disabled]="rpdSelect.isDisabled$ | async"
@@ -31,7 +37,7 @@ import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
       <div *ngIf="rpdSelect.isVisible$ | async">
         <ng-content></ng-content>
       </div>
-      {{ rpdSelect.isMultiple$ | async }}
+      isMultiple: {{ rpdSelect.isMultiple$ | async }}
     </div>
   `,
   providers: [
@@ -46,13 +52,14 @@ import { KEY_CODES, RpdSelectService } from '../rpd-select.service';
 })
 export class RpdSelectComponent implements ControlValueAccessor, OnInit {
   @Input() placeholder: string;
+  @Output() change: EventEmitter<any> = new EventEmitter();
   @ViewChild('selectButton') selectButton: ElementRef;
 
   private propagateChange = (_: any) => {};
   private propagateTouch = () => {};
   currentLabel$: Observable<any>;
   hostKeyDown$: Subject<KeyboardEvent> = new Subject<KeyboardEvent>();
-  hostKeyDownVisible$: Observable<any>;
+  hostVisibleKeyDown$: Observable<any>;
 
   constructor(private rpdSelect: RpdSelectService,
     private element: ElementRef) {
@@ -68,10 +75,26 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
       this.rpdSelect.toggleMultiple(!!isMultiple);
   }
 
-  ngOnInit() {
-    this.rpdSelect.value$.skip(2)
-      .subscribe(value => this.propagateChange(value));
+  @HostListener('keydown', ['$event'])
+  hostListenerKeyDown = event => this.hostKeyDown$.next(event);
 
+  ngOnInit() {
+    this.rpdSelect.value$.skip(1)
+      .subscribe(value => {
+        this.propagateChange(value);
+        this.change.next(value);
+      });
+
+    // Updates current label when value changes
+    this.currentLabel$ = this.rpdSelect.value$.skip(1)
+      .do(value => console.log('Current label: ', {value}))
+      .map(value => `Current Value: ${value}`);
+
+    /**
+     * Focus most recent option when select menu becomes visible and mark as
+     * touched
+     * Focus on select button when menu becomes invisible
+     */
     this.rpdSelect.isVisible$.skip(1)
       .do(() => this.propagateTouch())
       .subscribe(isVisible => {
@@ -79,21 +102,34 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
           this.focus();
       });
 
-    this.hostKeyDownVisible$ =  this.hostKeyDown$
+    // Keydown event stream filtered by visibility of select menu
+    this.hostVisibleKeyDown$ =  this.hostKeyDown$
       .withLatestFrom(this.rpdSelect.isVisible$)
-      .filter(([, isVisible]) => isVisible);
+      .filter(([, isVisible]) => isVisible)
+      .map(([event]) => event);
 
-    this.hostKeyDownVisible$.subscribe(([event]) => this.onHostKeyDown(event));
-    this.hostKeyDownVisible$
-      .filter(([event]) => {
-        // Filter teh key c0dez here
-        return true;
-      })
-      .subscribe(([event]) => this.onSearch(event));
+    // Keydown subscription when select menu is visible
+    this.hostVisibleKeyDown$
+      .subscribe(event => this.onVisibleHostKeyDown(event));
 
-    this.currentLabel$ = this.rpdSelect.value$.skip(2)
-      .do(value => console.log('Current label: ' + value))
-      .map(value => `Current Value: ${value}`);
+    /**
+     * Debounced keyboard search of options when select menu is visible
+     * - Maps event keyCode to a character
+     * - Filters out non-word characters
+     * - Buffers keydown events scheduled with a debounce
+     * - Filters out emissions if no characters were captured
+     * - Maps buffered characters to a string
+     * - Gets latest value of options map
+     * - Performs search with search string and options map
+     */
+    this.hostVisibleKeyDown$
+      .map(event => this._mapKeyCodeToChar(event))
+      .filter(char => this._isWordChar(char))
+      .buffer(this.hostVisibleKeyDown$.debounceTime(SEARCH_DEBOUNCE))
+      .filter(search => !!search.length)
+      .map(search => search.join(''))
+      .withLatestFrom(this.rpdSelect.options$)
+      .subscribe(([searchStr, options]) => this.search(searchStr, options));
   }
 
   writeValue(value: any) {
@@ -132,7 +168,7 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
     }
   }
 
-  onHostKeyDown(event: KeyboardEvent) {
+  onVisibleHostKeyDown(event: KeyboardEvent) {
     switch(event.keyCode) {
       case KEY_CODES.ESCAPE:
       case KEY_CODES.TAB:
@@ -149,7 +185,30 @@ export class RpdSelectComponent implements ControlValueAccessor, OnInit {
     }
   }
 
-  onSearch(...args) {
-    console.log('searching', args);
+  search(searchStr: string, options: Map<any, IRpdOption>) {
+    const regex = new RegExp('^' + searchStr, 'i');
+    const [option] = Array.from(options.values())
+      .filter((option: IRpdOption) => option.label && regex.test(option.label));
+
+    if (option) {
+      this.rpdSelect.setFocus(option.instance);
+    }
+  }
+
+  private _isWordChar(char) {
+    return /\w/.test(char);
+  }
+
+  private _isNumPadKey(event: KeyboardEvent) {
+    return event.location === NUMPAD_LOCATION &&
+      event.keyCode >= KEY_CODES.NUMPAD0 &&
+      event.keyCode <= KEY_CODES.NUMPAD9;
+  }
+
+  private _mapKeyCodeToChar(event: KeyboardEvent) {
+    const numPadOffset = this._isNumPadKey(event) ? NUMPAD_OFFSET : 0;
+    const keyCode = event.keyCode - numPadOffset;
+
+    return String.fromCharCode(keyCode);
   }
 }

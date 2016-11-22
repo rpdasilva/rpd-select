@@ -9,18 +9,21 @@ import {
   ViewChild
 } from '@angular/core';
 import { Observable } from 'rxjs';
-import { RpdSelectService, KEY_CODES } from '../rpd-select.service';
+import { RpdSelectService } from '../rpd-select.service';
+import { KEY_CODES } from '../rpd-select.constants';
 
 @Component({
   selector: 'rpd-option',
   template: `
     <div>
+      <input *ngIf="rpdSelect.isMultiple$ | async" type="checkbox"
+        [checked]="isSelected$ | async">
       <button (click)="updateValue($event, value)" #optionButton
         [style.background-color]="(isFocused$ | async) ? '#EEE' : 'initial'"
         [disabled]="disabled">
         <ng-content></ng-content>
 
-        <span *ngIf="isSelected$ | async">
+        <span *ngIf="!(rpdSelect.isMultiple$ | async) && (isSelected$ | async)">
           <svg viewBox="0 0 100 80" style="height: 0.65rem; fill: currentcolor;">
             <polygon points="37.316,80.48 0,43.164 17.798,
               25.366 37.316,44.885 82.202,0 100,17.798 37.316,80.48" />

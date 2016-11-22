@@ -5,36 +5,14 @@ import {
   Observable,
   Subject
 } from 'rxjs';
-import { OrderedMap as Map } from 'immutable';
-
-const FIRST = 'FIRST';
-const MOST_RECENT = 'MOST_RECENT';
-const PREV = 'PREV';
-const NEXT = 'NEXT';
-const ADD_OPTION = 'ADD_OPTION';
-const REMOVE_OPTION = 'REMOVE_OPTION';
-
-/**
- * Common Keyboard actions and their associated keycode.
- */
-export const KEY_CODES = {
-  COMMA: 188,
-  SEMICOLON : 186,
-  ENTER: 13,
-  ESCAPE: 27,
-  SPACE: 32,
-  PAGE_UP: 33,
-  PAGE_DOWN: 34,
-  END: 35,
-  HOME: 36,
-  LEFT_ARROW : 37,
-  UP_ARROW : 38,
-  RIGHT_ARROW : 39,
-  DOWN_ARROW : 40,
-  TAB : 9,
-  BACKSPACE: 8,
-  DELETE: 46
-};
+import {
+  FIRST,
+  MOST_RECENT,
+  PREV,
+  NEXT,
+  ADD_OPTION,
+  REMOVE_OPTION
+} from './rpd-select.constants';
 
 export interface IRpdOption {
   instance: any;
@@ -53,14 +31,15 @@ export class RpdSelectService {
   isVisible$: Observable<boolean>;
   focusedOption$: Observable<any>;
   options$: ConnectableObservable<Map<any, IRpdOption>>;
-  value$: Subject<any> = new Subject();
+  value$: BehaviorSubject<any> = new BehaviorSubject(null);
+  // value$: Subject<any> = new Subject();
 
   constructor() {
     this.isDisabled$ = this._isDisabled$.scan(this._toggle);
     this.isMultiple$ = this._isMultiple$.scan(this._toggle);
     this.isVisible$ = this._isVisible$.scan(this._toggle);
-    this.options$ = this._options$.scan(this._optionsReducer, Map())
-      .publish();
+    this.options$ = this._options$
+      .scan(this._optionsReducer, new Map()).publish();
     this.options$.connect();
 
     this.focusedOption$ = this._focusedOption$
@@ -71,6 +50,7 @@ export class RpdSelectService {
 
     this.isMultiple$
       .withLatestFrom(this.value$)
+      .delay(0)
       .subscribe(([isMultiple, value]) => {
         this._changeValueForMultiple(isMultiple, value, this.value$);
       });
@@ -85,7 +65,10 @@ export class RpdSelectService {
   }
 
   updateValue(value: any) {
-    this.value$.next(value);
+    if (value !== null) {
+      console.log('Updating value', {value});
+      this.value$.next(value);
+    }
   }
 
   toggleDisability(isDisabled?: boolean) {
@@ -93,6 +76,7 @@ export class RpdSelectService {
   }
 
   toggleMultiple(isMultiple) {
+    console.log('Toggle multiple', isMultiple);
     this._isMultiple$.next(isMultiple);
   }
 
@@ -117,11 +101,18 @@ export class RpdSelectService {
   }
 
   private _optionsReducer(options: Map<any, IRpdOption>, action) {
+    let newOptions;
+
     switch (action.type) {
       case ADD_OPTION:
-        return options.set(action.payload.instance, action.payload);
+        newOptions = new Map(options);
+        return newOptions.set(action.payload.instance, action.payload);
+
       case REMOVE_OPTION:
-        return options.delete(action.payload);
+        newOptions = new Map(options);
+        newOptions.delete(action.payload);
+        return newOptions;
+
       default:
         return options;
     }
@@ -134,15 +125,15 @@ export class RpdSelectService {
 
   private _findNextOption(options: Map<any, IRpdOption>, focused: any,
     direction: string) {
-    const instances = Array.from(options.keys() as any);
-    const currentIndex = instances.indexOf(focused);
+    const optionKeys = Array.from(options.keys());
+    const currentIndex = optionKeys.indexOf(focused);
 
     if (direction === FIRST || currentIndex === -1) {
-      return instances[0];
+      return optionKeys[0];
     } else if (direction === PREV && currentIndex > 0) {
-      return instances[currentIndex - 1];
-    } else if (direction === NEXT && currentIndex < instances.length - 1) {
-      return instances[currentIndex + 1];
+      return optionKeys[currentIndex - 1];
+    } else if (direction === NEXT && currentIndex < optionKeys.length - 1) {
+      return optionKeys[currentIndex + 1];
     } else {
       return focused;
     }
@@ -154,8 +145,9 @@ export class RpdSelectService {
   }
 
   private _changeValueForMultiple(isMultiple, value, value$) {
+    console.log('_changeValueForMultiple', {isMultiple, value});
     if (isMultiple && !Array.isArray(value)) {
-      value$.next([value]);
+      value === null ? value$.next([]) : value$.next([value]);
     } else if (!isMultiple && Array.isArray(value)) {
       value$.next(value[0]);
     }
